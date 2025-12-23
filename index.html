@@ -206,6 +206,11 @@
         <canvas id="webcam-preview"></canvas>
     </div>
 
+    <button id="start-cam" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  z-index:9999;padding:10px 16px;">
+        Bật camera
+    </button>
+
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -279,7 +284,7 @@
             loadWebImages();
             setupPostProcessing();
             setupEvents();
-            await initMediaPipe();
+            // await initMediaPipe();
 
             const loader = document.getElementById('loader');
             loader.style.opacity = 0;
@@ -618,7 +623,7 @@
             handLandmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
                     modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                    delegate: "GPU"
+                    delegate: "CPU"
                 },
                 runningMode: "VIDEO",
                 numHands: 1
@@ -668,34 +673,35 @@
                 const PINCH_THRESHOLD = 0.05;
 
                 // === PINCH START (chụm tay lần đầu) ===
-                if (pinchDist < PINCH_THRESHOLD && !STATE.pinchActive) {
-                    STATE.pinchActive = true;
+                if (pinchDist < PINCH_THRESHOLD) {
+                    if (!STATE.pinchActive) {
+                        STATE.pinchActive = true;
 
-                    const photos = particleSystem.filter(p => p.type === 'PHOTO');
-                    if (photos.length) {
-                        let next;
-                        do {
-                            next = photos[Math.floor(Math.random() * photos.length)].mesh;
-                        } while (next === STATE.focusTarget && photos.length > 1);
+                        const photos = particleSystem.filter(p => p.type === 'PHOTO');
+                        if (photos.length) {
+                            let next;
+                            do {
+                                next = photos[Math.floor(Math.random() * photos.length)].mesh;
+                            } while (next === STATE.focusTarget && photos.length > 1);
 
-                        STATE.mode = 'FOCUS';
-                        STATE.focusTarget = next;
+                            STATE.mode = 'FOCUS';
+                            STATE.focusTarget = next;
+                        }
                     }
+                    return; // ⛔ CHẶN TREE / SCATTER CHẠY XUỐNG
                 }
 
                 // === PINCH END (mở tay) ===
-                if (pinchDist >= PINCH_THRESHOLD && STATE.pinchActive) {
+                /* ===== KẾT THÚC PINCH ===== */
+                if (STATE.pinchActive) {
                     STATE.pinchActive = false;
-
                     STATE.mode = 'SCATTER';
                     STATE.focusTarget = null;
                 }
-                else if (avgDist < 0.25) {
+                if (avgDist < 0.25) {
                     STATE.mode = 'TREE';
-                    STATE.focusTarget = null;
                 } else if (avgDist > 0.4) {
                     STATE.mode = 'SCATTER';
-                    STATE.focusTarget = null;
                 }
             } else {
                 STATE.hand.detected = false;
@@ -779,6 +785,11 @@
         }
 
         init();
+        document.getElementById("start-cam").addEventListener("click", async () => {
+            await initMediaPipe();
+            document.getElementById("start-cam").remove();
+        });
+
     </script>
 </body>
 
