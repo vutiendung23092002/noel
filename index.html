@@ -673,35 +673,34 @@
                 const PINCH_THRESHOLD = 0.05;
 
                 // === PINCH START (chụm tay lần đầu) ===
-                if (pinchDist < PINCH_THRESHOLD) {
-                    if (!STATE.pinchActive) {
-                        STATE.pinchActive = true;
+                if (pinchDist < PINCH_THRESHOLD && !STATE.pinchActive) {
+                    STATE.pinchActive = true;
 
-                        const photos = particleSystem.filter(p => p.type === 'PHOTO');
-                        if (photos.length) {
-                            let next;
-                            do {
-                                next = photos[Math.floor(Math.random() * photos.length)].mesh;
-                            } while (next === STATE.focusTarget && photos.length > 1);
+                    const photos = particleSystem.filter(p => p.type === 'PHOTO');
+                    if (photos.length) {
+                        let next;
+                        do {
+                            next = photos[Math.floor(Math.random() * photos.length)].mesh;
+                        } while (next === STATE.focusTarget && photos.length > 1);
 
-                            STATE.mode = 'FOCUS';
-                            STATE.focusTarget = next;
-                        }
+                        STATE.mode = 'FOCUS';
+                        STATE.focusTarget = next;
                     }
-                    return; // ⛔ CHẶN TREE / SCATTER CHẠY XUỐNG
                 }
 
                 // === PINCH END (mở tay) ===
-                /* ===== KẾT THÚC PINCH ===== */
-                if (STATE.pinchActive) {
+                if (pinchDist >= PINCH_THRESHOLD && STATE.pinchActive) {
                     STATE.pinchActive = false;
+
                     STATE.mode = 'SCATTER';
                     STATE.focusTarget = null;
                 }
-                if (avgDist < 0.25) {
+                else if (avgDist < 0.25) {
                     STATE.mode = 'TREE';
+                    STATE.focusTarget = null;
                 } else if (avgDist > 0.4) {
                     STATE.mode = 'SCATTER';
+                    STATE.focusTarget = null;
                 }
             } else {
                 STATE.hand.detected = false;
