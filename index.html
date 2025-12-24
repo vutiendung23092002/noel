@@ -496,7 +496,6 @@
                     }
                 }
 
-
                 // Movement Easing
                 const lerpSpeed = (mode === 'FOCUS' && this.mesh === focusTargetMesh) ? 5.0 : 2.0;
                 this.mesh.position.lerp(target, lerpSpeed * dt);
@@ -751,7 +750,11 @@
 
                         STATE.mode = 'FOCUS';
                         STATE.focusTarget = next;
+
+                        // 👇 thêm dòng ở đây nè
+                        STATE.focusTarget.type = 'PHOTO';
                     }
+
                 }
 
                 // Sau khi pinchActive bị tắt, chỉ reset TREE/SCATTER khi tay mở hẳn
@@ -808,7 +811,7 @@
             if (STATE.mode === 'FOCUS' && STATE.focusTarget?.type === 'PHOTO') {
                 bloom.strength = 0; // không nuke ánh sáng vào ảnh
             } else if (STATE.mode === 'TREE') {
-                bloom.strength = 0.65; // 👈 tăng glow khi gom cây
+                bloom.strength = 0.4; // 👈 tăng glow khi gom cây
             } else if (STATE.mode === 'SCATTER') {
                 bloom.strength = 0.5;  // 👈 glow khi phân tán
             } else {
