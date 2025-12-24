@@ -734,61 +734,76 @@
         }
 
         function processGestures(result) {
-            if (!result.landmarks || result.landmarks.length === 0) {
-                STATE.hand.detected = false;
-                return;
-            }
+            if (result.landmarks && result.landmarks.length > 0) {
+                STATE.hand.detected = true;
+                const lm = result.landmarks[0];
+                const newX = (lm[9].x - 0.5) * 2;
+                const newY = (lm[9].y - 0.5) * 2;
 
-            STATE.hand.detected = true;
-            const lm = result.landmarks[0];
+                // vận tốc tay theo trục X (phẩy trái/phải)
+                STATE.hand.velocityX = newX - STATE.hand.x;
 
-            const thumbTip = lm[4];
-            const indexTip = lm[8];
+                STATE.hand.prevX = STATE.hand.x;
+                STATE.hand.x = newX;
+                STATE.hand.y = newY;
 
-            // Tính khoảng cách 2 ngón cái + trỏ
-            const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
 
-            // 1) Xoè tay → SCATTER cây thông
-            const otherTips = [lm[8], lm[12], lm[16], lm[20]];
-            const isPalmOpen = otherTips.every(tip => Math.abs(tip.x - lm[0].x) > 0.25 && tip.y < lm[0].y - 0.05);
+                const thumb = lm[4]; const index = lm[8]; const wrist = lm[0];
+                const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+                const tips = [lm[8], lm[12], lm[16], lm[20]];
+                let avgDist = 0;
+                tips.forEach(t => avgDist += Math.hypot(t.x - wrist.x, t.y - wrist.y));
+                avgDist /= 4;
 
-            if (isPalmOpen && pinchDist > 0.25) {
-                STATE.mode = 'SCATTER';
-                STATE.focusTarget = null;
-                return;
-            }
+                const PINCH_THRESHOLD = 0.05;
+                const PINCH_RESET_THRESHOLD = 0.25;
 
-            // 2) Nắm tay → Tụ lại TREE
-            const fingerFold = otherTips.filter(tip => Math.hypot(tip.x - lm[0].x, tip.y - lm[0].y) < 0.15).length;
-            const isFist = fingerFold >= 3 && pinchDist < 0.2; // 3 ngón co lại gần cổ tay + 2 ngón không mở
+                // === PINCH START (chụm tay lần đầu) ===
+                if (pinchDist < PINCH_THRESHOLD && !STATE.pinchActive) {
+                    STATE.pinchActive = true;
 
-            if (isFist) {
-                STATE.mode = 'TREE';
-                STATE.focusTarget = null;
-                return;
-            }
+                    const photos = particleSystem.filter(p => p.type === 'PHOTO');
+                    if (photos.length) {
+                        let next;
+                        do {
+                            next = photos[Math.floor(Math.random() * photos.length)].mesh;
+                        } while (next === STATE.focusTarget && photos.length > 1);
 
-            // 3) Pinch 2 ngón chụm → zoom ảnh
-            if (pinchDist < 0.07) {
-                const photos = photoMeshGroup.children;
-                if (photos.length) {
-                    STATE.focusIndex = (STATE.focusIndex + 1) % photos.length;
-                    STATE.focusTarget = photos[STATE.focusIndex];
-                    STATE.focusTarget.type = 'PHOTO';
-                    STATE.mode = 'FOCUS';
+                        STATE.mode = 'FOCUS';
+                        STATE.focusTarget = next;
+                        STATE.focusIndex = (STATE.focusIndex + 1) % PRELOADED_IMAGES.length;
+                        STATE.focusTarget = photoMeshGroup.children[STATE.focusIndex];
+                        STATE.mode = 'FOCUS';
+
+                        // 👇 thêm dòng ở đây nè
+                        STATE.focusTarget.type = 'PHOTO';
+                    }
+
                 }
-                return;
-            }
 
-            // 4) 2 ngón tách ra khoảng 4cm (~0.25 trong normalized coord) → thu nhỏ ảnh
-            if (pinchDist > 0.22 && pinchDist < 0.35 && STATE.mode === 'FOCUS') {
-                STATE.focusTarget.scale.lerp(
-                    new THREE.Vector3(1.0, 1.0, 1.0),
-                    6 * dt
-                );
-                STATE.mode = 'TREE';
-                STATE.focusTarget = null;
-                return;
+                // Sau khi pinchActive bị tắt, chỉ reset TREE/SCATTER khi tay mở hẳn
+                if (pinchDist > PINCH_RESET_THRESHOLD && !STATE.pinchActive) {
+                    STATE.mode = 'TREE';
+                    STATE.focusTarget = null;
+                }
+
+
+                // === PINCH END (mở tay) ===
+                if (pinchDist >= PINCH_THRESHOLD && STATE.pinchActive) {
+                    STATE.pinchActive = false;
+
+                    STATE.mode = 'SCATTER';
+                    STATE.focusTarget = null;
+                }
+                else if (avgDist < 0.25) {
+                    STATE.mode = 'TREE';
+                    STATE.focusTarget = null;
+                } else if (avgDist > 0.4) {
+                    STATE.mode = 'SCATTER';
+                    STATE.focusTarget = null;
+                }
+            } else {
+                STATE.hand.detected = false;
             }
         }
 
