@@ -488,6 +488,15 @@
                     this.mesh.children[1].material.emissiveIntensity = 0;
                 }
 
+                // 👉 Tăng nháy sáng cho cây trong TREE và SCATTER (không động vào PHOTO)
+                if ((mode === 'TREE' || mode === 'SCATTER') && this.type !== 'PHOTO') {
+                    const lightBlink = 1.0 + 1.4 * Math.sin(clock.elapsedTime * 12 + this.mesh.id);
+                    if (this.mesh.material?.emissiveIntensity !== undefined) {
+                        this.mesh.material.emissiveIntensity = Math.abs(lightBlink);
+                    }
+                }
+
+
                 // Movement Easing
                 const lerpSpeed = (mode === 'FOCUS' && this.mesh === focusTargetMesh) ? 5.0 : 2.0;
                 this.mesh.position.lerp(target, lerpSpeed * dt);
@@ -547,7 +556,7 @@
                 color: CONFIG.colors.deepGreen,
                 metalness: 0.2, roughness: 0.8,
                 emissive: 0x002200,
-                emissiveIntensity: 0.5
+                emissiveIntensity: 0.2
             });
 
             const redMat = new THREE.MeshPhysicalMaterial({
@@ -795,24 +804,32 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            // 👉 Tắt bloom chỉ khi focus đúng 1 ảnh PHOTO
-            if (STATE.mode === 'FOCUS' && STATE.focusTarget && STATE.focusTarget.children?.length > 1) {
-                bloom.strength = 0; // tắt flashbang cho ảnh
+            // 1) Điều khiển bloom theo mode
+            if (STATE.mode === 'FOCUS' && STATE.focusTarget?.type === 'PHOTO') {
+                bloom.strength = 0; // không nuke ánh sáng vào ảnh
+            } else if (STATE.mode === 'TREE') {
+                bloom.strength = 0.65; // 👈 tăng glow khi gom cây
+            } else if (STATE.mode === 'SCATTER') {
+                bloom.strength = 0.5;  // 👈 glow khi phân tán
             } else {
-                bloom.strength = 0.1; // giữ hiệu ứng cho cây thông và scene
+                bloom.strength = 0.25; // mặc định vẫn có hiệu ứng
             }
 
+            // 2) Giữ xoay scene scatter
             if (STATE.mode === 'SCATTER') {
                 STATE.rotation.y += 0.09 * dt;
             }
 
+            // 3) Clamp rotation X để khỏi lật scene
             STATE.rotation.x = THREE.MathUtils.clamp(STATE.rotation.x, -Math.PI / 6, Math.PI / 6);
             mainGroup.rotation.x = STATE.rotation.x;
             mainGroup.rotation.y = STATE.rotation.y;
 
+            // 4) Update particle + render
             particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget));
             composer.render();
         }
+
 
 
         init();
