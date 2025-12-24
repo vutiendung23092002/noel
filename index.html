@@ -796,6 +796,12 @@
                 STATE.rotation.y += 0.09 * dt; // 0.05 = siêu chậm, cinematic rung vibe
             }
 
+            if (STATE.mode === 'FOCUS' && STATE.focusTarget?.type === 'PHOTO') {
+                bloom.strength = 0;
+            } else {
+                bloom.strength = 0.1; // bloom nhẹ cho scene TREE/SCATTER
+            }
+
             // Giữ giới hạn nghiêng trục X cho mọi mode
             STATE.rotation.x = THREE.MathUtils.clamp(STATE.rotation.x, -Math.PI / 6, Math.PI / 6);
 
