@@ -162,6 +162,40 @@
             /* Hidden by default but functional */
             pointer-events: none;
         }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+
+        .modal-content {
+            background: #111;
+            padding: 20px;
+            border-radius: 16px;
+            width: 260px;
+            color: #fff;
+            font-size: 14px;
+            position: relative;
+        }
+
+        #close-modal {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+        }
     </style>
 
     <style>
@@ -210,6 +244,19 @@
   z-index:9999;padding:10px 16px;">
         Bật camera
     </button>
+    <div id="guide-modal" class="modal">
+        <div class="modal-content">
+            <button id="close-modal">×</button>
+            <h2>Hướng dẫn</h2>
+            <ul>
+                <li>Thêm ảnh</li>
+                <li>Bật camera</li>
+                <li>Xoè tay để phân tán</li>
+                <li>Nắm tay để tụ cây thông</li>
+                <li>Chụm đầu ngón tay để phóng to ảnh</li>
+            </ul>
+        </div>
+    </div>
 
     <script type="module">
         import * as THREE from 'three';
@@ -671,6 +718,7 @@
                 avgDist /= 4;
 
                 const PINCH_THRESHOLD = 0.05;
+                const PINCH_RESET_THRESHOLD = 0.25;
 
                 // === PINCH START (chụm tay lần đầu) ===
                 if (pinchDist < PINCH_THRESHOLD && !STATE.pinchActive) {
@@ -687,6 +735,13 @@
                         STATE.focusTarget = next;
                     }
                 }
+
+                // Sau khi pinchActive bị tắt, chỉ reset TREE/SCATTER khi tay mở hẳn
+                if (pinchDist > PINCH_RESET_THRESHOLD && !STATE.pinchActive) {
+                    STATE.mode = 'TREE';
+                    STATE.focusTarget = null;
+                }
+
 
                 // === PINCH END (mở tay) ===
                 if (pinchDist >= PINCH_THRESHOLD && STATE.pinchActive) {
@@ -731,50 +786,19 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            /* ===== SCATTER MODE: xoay bằng PHẨY ===== */
-            if (STATE.mode === 'SCATTER' && STATE.hand.detected) {
-
-                // xoay trục X nhẹ theo tay (nghiêng)
-                const targetRotX = STATE.hand.y * Math.PI * 0.25;
-                STATE.rotation.x += (targetRotX - STATE.rotation.x) * 2.0 * dt;
-
-                // phẩy tay → bơm lực xoay
-                const swipeForce = THREE.MathUtils.clamp(
-                    STATE.hand.velocityX * 12,
-                    -1.5,
-                    1.5
-                );
-
-                STATE.spinVelocityY += swipeForce;
+            /* ===== SCATTER MODE: auto xoay cây nhẹ nhàng ===== */
+            if (STATE.mode === 'SCATTER') {
+                // Tự xoay 360 độ rất nhẹ, không phụ thuộc gesture
+                STATE.rotation.y += 0.09 * dt; // 0.05 = siêu chậm, cinematic rung vibe
             }
 
-            /* ===== TREE / FOCUS MODE ===== */
-            if (STATE.mode === 'TREE') {
-                STATE.spinVelocityY *= 0.9; // dừng dần
-                STATE.rotation.y += 0.3 * dt;
-                STATE.rotation.x += (0 - STATE.rotation.x) * 2.0 * dt;
-            }
+            // Giữ giới hạn nghiêng trục X cho mọi mode
+            STATE.rotation.x = THREE.MathUtils.clamp(STATE.rotation.x, -Math.PI / 6, Math.PI / 6);
 
-            /* ===== MA SÁT + GIỚI HẠN ===== */
-            STATE.spinVelocityY *= 0.5;
-
-            STATE.spinVelocityY = THREE.MathUtils.clamp(
-                STATE.spinVelocityY,
-                -0.03,
-                0.03
-            );
-
-            STATE.rotation.y += STATE.spinVelocityY;
-
-            // chặn lật ngửa cây
-            STATE.rotation.x = THREE.MathUtils.clamp(
-                STATE.rotation.x,
-                -Math.PI / 6,
-                Math.PI / 6
-            );
-
+            // Áp rotation vào group
             mainGroup.rotation.y = STATE.rotation.y;
             mainGroup.rotation.x = STATE.rotation.x;
+
 
             particleSystem.forEach(p =>
                 p.update(dt, STATE.mode, STATE.focusTarget)
@@ -788,6 +812,19 @@
             await initMediaPipe();
             document.getElementById("start-cam").remove();
         });
+
+        // Tự tắt modal sau 20s
+        setTimeout(() => {
+            const modal = document.getElementById("guide-modal");
+            if (modal) modal.style.display = "none";
+        }, 20000);
+
+        // Nút tắt nhanh modal
+        document.getElementById("close-modal").addEventListener("click", () => {
+            const modal = document.getElementById("guide-modal");
+            if (modal) modal.style.display = "none";
+        });
+
 
     </script>
 </body>
