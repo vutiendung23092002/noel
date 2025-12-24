@@ -318,6 +318,7 @@
         let clock = new THREE.Clock();
         let particleSystem = [];
         let photoMeshGroup = new THREE.Group();
+        let bloom;
         let handLandmarker, video, webcamCanvas, webcamCtx;
         let caneTexture;
 
@@ -392,13 +393,17 @@
             const renderScene = new RenderPass(scene, camera);
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
             bloomPass.threshold = 0.7;
-            bloomPass.strength = 0.3;
+            bloomPass.strength = 0.1;
             bloomPass.radius = 0.4;
 
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
             composer.addPass(bloomPass);
+
+            // 👉 Gán để animate() dùng
+            bloom = bloomPass;
         }
+
 
         function createTextures() {
             const canvas = document.createElement('canvas');
@@ -790,32 +795,25 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            /* ===== SCATTER MODE: auto xoay cây nhẹ nhàng ===== */
-            if (STATE.mode === 'SCATTER') {
-                // Tự xoay 360 độ rất nhẹ, không phụ thuộc gesture
-                STATE.rotation.y += 0.09 * dt; // 0.05 = siêu chậm, cinematic rung vibe
-            }
-
-            if (STATE.mode === 'FOCUS' && STATE.focusTarget?.type === 'PHOTO') {
-                bloom.strength = 0;
+            // 👉 Tắt bloom chỉ khi focus đúng 1 ảnh PHOTO
+            if (STATE.mode === 'FOCUS' && STATE.focusTarget && STATE.focusTarget.children?.length > 1) {
+                bloom.strength = 0; // tắt flashbang cho ảnh
             } else {
-                bloom.strength = 0.1; // bloom nhẹ cho scene TREE/SCATTER
+                bloom.strength = 0.1; // giữ hiệu ứng cho cây thông và scene
             }
 
-            // Giữ giới hạn nghiêng trục X cho mọi mode
+            if (STATE.mode === 'SCATTER') {
+                STATE.rotation.y += 0.09 * dt;
+            }
+
             STATE.rotation.x = THREE.MathUtils.clamp(STATE.rotation.x, -Math.PI / 6, Math.PI / 6);
-
-            // Áp rotation vào group
-            mainGroup.rotation.y = STATE.rotation.y;
             mainGroup.rotation.x = STATE.rotation.x;
+            mainGroup.rotation.y = STATE.rotation.y;
 
-
-            particleSystem.forEach(p =>
-                p.update(dt, STATE.mode, STATE.focusTarget)
-            );
-
+            particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget));
             composer.render();
         }
+
 
         init();
         document.getElementById("start-cam").addEventListener("click", async () => {
