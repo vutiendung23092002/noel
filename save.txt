@@ -547,7 +547,7 @@
                 color: CONFIG.colors.deepGreen,
                 metalness: 0.2, roughness: 0.8,
                 emissive: 0x002200,
-                emissiveIntensity: 0.5
+                emissiveIntensity: 0.2
             });
 
             const redMat = new THREE.MeshPhysicalMaterial({
