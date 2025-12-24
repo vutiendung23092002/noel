@@ -734,76 +734,56 @@
         }
 
         function processGestures(result) {
-            if (result.landmarks && result.landmarks.length > 0) {
-                STATE.hand.detected = true;
-                const lm = result.landmarks[0];
-                const newX = (lm[9].x - 0.5) * 2;
-                const newY = (lm[9].y - 0.5) * 2;
-
-                // vận tốc tay theo trục X (phẩy trái/phải)
-                STATE.hand.velocityX = newX - STATE.hand.x;
-
-                STATE.hand.prevX = STATE.hand.x;
-                STATE.hand.x = newX;
-                STATE.hand.y = newY;
-
-
-                const thumb = lm[4]; const index = lm[8]; const wrist = lm[0];
-                const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
-                const tips = [lm[8], lm[12], lm[16], lm[20]];
-                let avgDist = 0;
-                tips.forEach(t => avgDist += Math.hypot(t.x - wrist.x, t.y - wrist.y));
-                avgDist /= 4;
-
-                const PINCH_THRESHOLD = 0.05;
-                const PINCH_RESET_THRESHOLD = 0.25;
-
-                // === PINCH START (chụm tay lần đầu) ===
-                if (pinchDist < PINCH_THRESHOLD && !STATE.pinchActive) {
-                    STATE.pinchActive = true;
-
-                    const photos = particleSystem.filter(p => p.type === 'PHOTO');
-                    if (photos.length) {
-                        let next;
-                        do {
-                            next = photos[Math.floor(Math.random() * photos.length)].mesh;
-                        } while (next === STATE.focusTarget && photos.length > 1);
-
-                        STATE.mode = 'FOCUS';
-                        STATE.focusTarget = next;
-                        STATE.focusIndex = (STATE.focusIndex + 1) % PRELOADED_IMAGES.length;
-                        STATE.focusTarget = photoMeshGroup.children[STATE.focusIndex];
-                        STATE.mode = 'FOCUS';
-
-                        // 👇 thêm dòng ở đây nè
-                        STATE.focusTarget.type = 'PHOTO';
-                    }
-
-                }
-
-                // Sau khi pinchActive bị tắt, chỉ reset TREE/SCATTER khi tay mở hẳn
-                if (pinchDist > PINCH_RESET_THRESHOLD && !STATE.pinchActive) {
-                    STATE.mode = 'TREE';
-                    STATE.focusTarget = null;
-                }
-
-
-                // === PINCH END (mở tay) ===
-                if (pinchDist >= PINCH_THRESHOLD && STATE.pinchActive) {
-                    STATE.pinchActive = false;
-
-                    STATE.mode = 'SCATTER';
-                    STATE.focusTarget = null;
-                }
-                else if (avgDist < 0.25) {
-                    STATE.mode = 'TREE';
-                    STATE.focusTarget = null;
-                } else if (avgDist > 0.4) {
-                    STATE.mode = 'SCATTER';
-                    STATE.focusTarget = null;
-                }
-            } else {
+            if (!result.landmarks || result.landmarks.length === 0) {
                 STATE.hand.detected = false;
+                return;
+            }
+
+            STATE.hand.detected = true;
+            const lm = result.landmarks[0];
+
+            // Tính khoảng cách 5 đầu ngón tới cổ tay
+            const tips = [lm[4], lm[8], lm[12], lm[16], lm[20]];
+            let fingerDistSum = 0;
+            tips.forEach(tip => {
+                fingerDistSum += Math.hypot(tip.x - lm[0].x, tip.y - lm[0].y);
+            });
+            const avgFingerDist = fingerDistSum / 5;
+
+            // Tính pinch 2 ngón (cái + trỏ)
+            const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+
+            // 👉 1. Giơ 5 ngón mở hoàn toàn để gom cây
+            if (tips.every(tip => tip.y < lm[0].y - 0.12)) {
+                STATE.mode = 'TREE';
+                STATE.focusTarget = null;
+                return;
+            }
+
+            // 👉 2. Nắm cả bàn tay để phân tán cây
+            if (avgFingerDist < 0.18) {
+                STATE.mode = 'SCATTER';
+                STATE.focusTarget = null;
+                return;
+            }
+
+            // 👉 3. Xoè 2 ngón cái + trỏ để zoom ảnh
+            if (pinchDist > 0.3 && tips[0].y < lm[0].y - 0.1 && tips[1].y < lm[0].y - 0.1) {
+                const photos = photoMeshGroup.children;
+                if (photos.length) {
+                    STATE.focusIndex = (STATE.focusIndex + 1) % photos.length;
+                    STATE.focusTarget = photos[STATE.focusIndex];
+                    STATE.focusTarget.type = 'PHOTO';
+                    STATE.mode = 'FOCUS';
+                }
+                return;
+            }
+
+            // 👉 4. Chụm 2 ngón cái + trỏ để thu nhỏ ảnh
+            if (pinchDist < 0.06 && STATE.mode === 'FOCUS') {
+                STATE.mode = 'TREE';
+                STATE.focusTarget = null;
+                return;
             }
         }
 
