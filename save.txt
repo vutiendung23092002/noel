@@ -7,6 +7,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mừng giáng sinh 2025</title>
+    <link rel="icon" type="image/x-icon" href="./assets/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png">
+    <link rel="manifest" href="/site.webmanifest">
+
     <style>
         body {
             margin: 0;
@@ -287,7 +291,22 @@
         };
 
         const PRELOADED_IMAGES = [
-            "./assets/image1.jpg"
+            "./assets/image1.jpg",
+            "./assets/image2.jpg",
+            "./assets/image3.jpg",
+            "./assets/image4.jpg",
+            "./assets/image5.jpg",
+            "./assets/image6.jpg",
+            "./assets/image7.jpg",
+            "./assets/image8.jpg",
+            "./assets/image9.jpg",
+            "./assets/image10.jpg",
+            "./assets/image11.jpg",
+            "./assets/image12.jpg",
+            "./assets/image13.jpg",
+            "./assets/image14.jpg",
+            "./assets/image15.jpg",
+            "./assets/image16.jpg",
         ];
 
 
@@ -486,6 +505,14 @@
 
                 if (mode === 'FOCUS' && this.type === 'PHOTO') {
                     this.mesh.children[1].material.emissiveIntensity = 0;
+                }
+
+                // 👉 Tăng nháy sáng cho cây trong TREE và SCATTER (không động vào PHOTO)
+                if ((mode === 'TREE' || mode === 'SCATTER') && this.type !== 'PHOTO') {
+                    const lightBlink = 1.0 + 1.4 * Math.sin(clock.elapsedTime * 12 + this.mesh.id);
+                    if (this.mesh.material?.emissiveIntensity !== undefined) {
+                        this.mesh.material.emissiveIntensity = Math.abs(lightBlink);
+                    }
                 }
 
                 // Movement Easing
@@ -742,7 +769,11 @@
 
                         STATE.mode = 'FOCUS';
                         STATE.focusTarget = next;
+
+                        // 👇 thêm dòng ở đây nè
+                        STATE.focusTarget.type = 'PHOTO';
                     }
+
                 }
 
                 // Sau khi pinchActive bị tắt, chỉ reset TREE/SCATTER khi tay mở hẳn
@@ -795,24 +826,32 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            // 👉 Tắt bloom chỉ khi focus đúng 1 ảnh PHOTO
-            if (STATE.mode === 'FOCUS' && STATE.focusTarget && STATE.focusTarget.children?.length > 1) {
-                bloom.strength = 0; // tắt flashbang cho ảnh
+            // 1) Điều khiển bloom theo mode
+            if (STATE.mode === 'FOCUS' && STATE.focusTarget?.type === 'PHOTO') {
+                bloom.strength = 0; // không nuke ánh sáng vào ảnh
+            } else if (STATE.mode === 'TREE') {
+                bloom.strength = 0.4; // 👈 tăng glow khi gom cây
+            } else if (STATE.mode === 'SCATTER') {
+                bloom.strength = 0.5;  // 👈 glow khi phân tán
             } else {
-                bloom.strength = 0.1; // giữ hiệu ứng cho cây thông và scene
+                bloom.strength = 0.25; // mặc định vẫn có hiệu ứng
             }
 
+            // 2) Giữ xoay scene scatter
             if (STATE.mode === 'SCATTER') {
                 STATE.rotation.y += 0.09 * dt;
             }
 
+            // 3) Clamp rotation X để khỏi lật scene
             STATE.rotation.x = THREE.MathUtils.clamp(STATE.rotation.x, -Math.PI / 6, Math.PI / 6);
             mainGroup.rotation.x = STATE.rotation.x;
             mainGroup.rotation.y = STATE.rotation.y;
 
+            // 4) Update particle + render
             particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget));
             composer.render();
         }
+
 
 
         init();

@@ -300,6 +300,7 @@
             "./assets/image7.jpg",
             "./assets/image8.jpg",
             "./assets/image9.jpg",
+            "./assets/image10.jpg",
             "./assets/image11.jpg",
             "./assets/image12.jpg",
             "./assets/image13.jpg",
@@ -311,7 +312,7 @@
 
         const STATE = {
             mode: 'TREE',
-            focusIndex: -1,
+            focusIndex: 0,
             focusTarget: null,
 
             hand: {
@@ -768,6 +769,9 @@
 
                         STATE.mode = 'FOCUS';
                         STATE.focusTarget = next;
+                        STATE.focusIndex = (STATE.focusIndex + 1) % PRELOADED_IMAGES.length;
+                        STATE.focusTarget = photoMeshGroup.children[STATE.focusIndex];
+                        STATE.mode = 'FOCUS';
 
                         // 👇 thêm dòng ở đây nè
                         STATE.focusTarget.type = 'PHOTO';
@@ -824,6 +828,18 @@
         function animate() {
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
+
+            if (STATE.mode === 'FOCUS' && STATE.focusTarget) {
+                STATE.focusTarget.scale.lerp(
+                    new THREE.Vector3(4.5, 4.5, 4.5),
+                    6 * dt // 👈 zoom mượt hơn khi chụm tay
+                );
+            } else if (STATE.mode === 'TREE') {
+                photoMeshGroup.children.forEach(mesh => {
+                    mesh.scale.lerp(new THREE.Vector3(1.0, 1.0, 1.0), 2 * dt);
+                });
+            }
+
 
             // 1) Điều khiển bloom theo mode
             if (STATE.mode === 'FOCUS' && STATE.focusTarget?.type === 'PHOTO') {
