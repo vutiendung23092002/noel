@@ -735,31 +735,40 @@
 
         function processGestures(result) {
             if (!result.landmarks || result.landmarks.length === 0) {
-                // 👉 Không có tay trong cam → auto tụ cây
-                STATE.mode = 'TREE';
-                STATE.focusTarget = null;
+                STATE.hand.detected = false;
                 return;
             }
 
             STATE.hand.detected = true;
             const lm = result.landmarks[0];
 
-            const thumb = lm[4];
-            const index = lm[8];
-            const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+            const thumbTip = lm[4];
+            const indexTip = lm[8];
 
-            // 👉 1. Xoè tay để phân tán cây (SCATTER)
-            const tips = [lm[4], lm[8], lm[12], lm[16], lm[20]];
-            const palmOpen = tips.every(tip => tip.y < lm[0].y - 0.1 && Math.abs(tip.x - lm[0].x) > 0.15);
+            // Tính khoảng cách 2 ngón cái + trỏ
+            const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
 
-            if (palmOpen && pinchDist > 0.25) {
+            // 1) Xoè tay → SCATTER cây thông
+            const otherTips = [lm[8], lm[12], lm[16], lm[20]];
+            const isPalmOpen = otherTips.every(tip => Math.abs(tip.x - lm[0].x) > 0.25 && tip.y < lm[0].y - 0.05);
+
+            if (isPalmOpen && pinchDist > 0.25) {
                 STATE.mode = 'SCATTER';
                 STATE.focusTarget = null;
-                STATE.hand.openStartTime = 0;
                 return;
             }
 
-            // 👉 2. 2 ngón cái + trỏ chụm lại → zoom ảnh
+            // 2) Nắm tay → Tụ lại TREE
+            const fingerFold = otherTips.filter(tip => Math.hypot(tip.x - lm[0].x, tip.y - lm[0].y) < 0.15).length;
+            const isFist = fingerFold >= 3 && pinchDist < 0.2; // 3 ngón co lại gần cổ tay + 2 ngón không mở
+
+            if (isFist) {
+                STATE.mode = 'TREE';
+                STATE.focusTarget = null;
+                return;
+            }
+
+            // 3) Pinch 2 ngón chụm → zoom ảnh
             if (pinchDist < 0.07) {
                 const photos = photoMeshGroup.children;
                 if (photos.length) {
@@ -771,8 +780,12 @@
                 return;
             }
 
-            // 👉 3. 2 ngón cái + trỏ mở ra xa → thu nhỏ ảnh
-            if (pinchDist > 0.22 && STATE.mode === 'FOCUS') {
+            // 4) 2 ngón tách ra khoảng 4cm (~0.25 trong normalized coord) → thu nhỏ ảnh
+            if (pinchDist > 0.22 && pinchDist < 0.35 && STATE.mode === 'FOCUS') {
+                STATE.focusTarget.scale.lerp(
+                    new THREE.Vector3(1.0, 1.0, 1.0),
+                    6 * dt
+                );
                 STATE.mode = 'TREE';
                 STATE.focusTarget = null;
                 return;
